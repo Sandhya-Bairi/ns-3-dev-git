@@ -64,13 +64,19 @@ TcpNewReno::GetTypeId (void)
   return tid;
 }
 
-TcpNewReno::TcpNewReno (void) : TcpCongestionOps ()
+TcpNewReno::TcpNewReno (void) : TcpCongestionOps (),
+m_currentERE (0),
+m_lastSampleERE (0),
+m_minRtt (Time (0))
 {
   NS_LOG_FUNCTION (this);
 }
 
 TcpNewReno::TcpNewReno (const TcpNewReno& sock)
-  : TcpCongestionOps (sock)
+  : TcpCongestionOps (sock),
+m_currentERE (sock.m_currentERE),
+m_lastSampleERE (sock.m_lastSampleERE),
+m_minRtt (Time (0))
 {
   NS_LOG_FUNCTION (this);
 }
@@ -136,6 +142,8 @@ TcpNewReno::SlowStart (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked)
   return 0;
 }
 
+
+
 /**
  * \brief NewReno congestion avoidance
  *
@@ -174,6 +182,12 @@ TcpNewReno::IncreaseWindow (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked)
 {
   NS_LOG_FUNCTION (this << tcb << segmentsAcked);
 
+  /* Obtaining m_ssThresh value from the GetSsThresh() function. 
+   * 0 is sent as argument for bytesInFlight because we do not need this variable in calculating m_ssThresh. 
+   * The function signature demands this parameter, though.
+   */
+  tcb->m_ssThresh = GetSsThresh(tcb, 0);  
+
   if (tcb->m_cWnd < tcb->m_ssThresh)
     {
       segmentsAcked = SlowStart (tcb, segmentsAcked);
@@ -194,20 +208,105 @@ TcpNewReno::IncreaseWindow (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked)
    */
 }
 
+
+
+/**
+ * \brief This function is called on receipt of every ACK
+ *
+ * In this function, we calculate m_minRtt, and call the function EstimateERE() which calculates the ERE (m_currentERE) value
+ *
+ * \param tcb internal congestion state
+ * \param segmentsAcked count of segments acked
+ * \param rtt last round-trip-time
+ */
+
+void 
+TcpNewReno::PktsAcked (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked,
+                          const Time& rtt)
+{
+  NS_LOG_FUNCTION (this << tcb << segmentsAcked << rtt);
+
+  if (rtt.IsZero ())
+    {
+      NS_LOG_WARN ("RTT measured is zero!");
+      return;
+    }
+
+  // Update minRtt
+  if (m_minRtt.IsZero ())
+    {
+      m_minRtt = rtt;
+    }
+  else
+    {
+      if (rtt < m_minRtt)
+        {
+          m_minRtt = rtt;
+        }
+    }
+
+  NS_LOG_LOGIC ("MinRtt: " << m_minRtt.GetMilliSeconds () << "ms");
+
+  EstimateERE (rtt, tcb);
+    
+}
+
+
+
+/**
+ * \brief To calculate the Eligible Rate Estimate (ERE), denoted by the variable m_currentERE
+ *
+ * We have issues regarding its implementation, so for now, we have set m_currentERE as a constant
+ *
+ * \param rtt last round-trip-time
+ * \param tcb internal congestion state
+ */
+
+void
+TcpNewReno::EstimateERE (const Time &rtt, Ptr<TcpSocketState> tcb)
+{
+  NS_LOG_FUNCTION (this);
+
+  NS_ASSERT (!rtt.IsZero ());
+	
+  m_currentERE = 10;
+}
+
+
+
+
+
 std::string
 TcpNewReno::GetName () const
 {
   return "TcpNewReno";
 }
 
+
+/**
+ * \brief To return the most recent m_ssThresh value
+ *
+ * The m_ssThresh is a maximum of the following three values:
+ *         (2 * state->m_segmentSize) this is equivalent to two segments. m_ssThresh should never go below this
+ *         (state->m_ssThresh)        the current m_ssThresh value
+ *         (m_currentERE * m_minRtt)  this metric is as proposed in the paper
+ *
+ * \param tcb internal congestion state
+ * \param bytesInFlight the amount of data in flight. This value is not used in m_ssThresh calculation
+ */
+
 uint32_t
 TcpNewReno::GetSsThresh (Ptr<const TcpSocketState> state,
                          uint32_t bytesInFlight)
 {
-  NS_LOG_FUNCTION (this << state << bytesInFlight);
+  NS_LOG_FUNCTION (this << state << "EstimatedERE: " << m_currentERE << " minRtt: " << m_minRtt);
 
-  return std::max (2 * state->m_segmentSize, bytesInFlight / 2);
+  
+  uint32_t substitute = std::max (2 * state->m_segmentSize, uint32_t (state->m_ssThresh));
+  return std::max (substitute, uint32_t (m_currentERE * static_cast<double> (m_minRtt.GetSeconds ())));
 }
+
+
 
 Ptr<TcpCongestionOps>
 TcpNewReno::Fork ()

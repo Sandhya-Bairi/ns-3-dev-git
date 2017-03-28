@@ -186,12 +186,21 @@ public:
   virtual void IncreaseWindow (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
   virtual uint32_t GetSsThresh (Ptr<const TcpSocketState> tcb,
                                 uint32_t bytesInFlight);
+  virtual void PktsAcked (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked,
+                          const Time& rtt);
 
   virtual Ptr<TcpCongestionOps> Fork ();
 
 protected:
+  double  m_currentERE;              //!< Current value of the estimated ERE (Eligible Rate Estimate)
+  double  m_lastSampleERE;           //!< Last ERE sample
+  Time    m_minRtt;                 //!< Minimum RTT
   virtual uint32_t SlowStart (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
   virtual void CongestionAvoidance (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
+
+private:
+ void EstimateERE (const Time& rtt, Ptr<TcpSocketState> tcb);
+
 };
 
 } // namespace ns3
