@@ -192,14 +192,54 @@ public:
   virtual Ptr<TcpCongestionOps> Fork ();
 
 protected:
-  double  m_currentERE;              //!< Current value of the estimated ERE (Eligible Rate Estimate)
-  double  m_lastSampleERE;           //!< Last ERE sample
-  Time    m_minRtt;                 //!< Minimum RTT
+  TracedValue<double>    m_currentERE;             //!< Current value of the ERE (Eligible Rate Estimate)
+  TracedValue<double>    m_bestRate;               //!< The best sending rate. Determined by using the value of m_minRtt   
+
+  Time                   m_interval;               //!< The time interval over which ERE is calculated, as given in WestWood ABSE
+  
+  double                 m_lastSampleERE;          //!< Last ERE sample after being filtered
+  double                 m_lastERE;                //!< Will become the previous instantaneous ERE value    
+  
+  Time                   m_minRtt;                 //!< Minimum RTT
+  Time                   m_Rtt;                    //!< RTT                 //!< 0 for none, 1 for Tustin
+
+
+  int                    m_ackedSinceT;            //!< The number of segments ACKed between T values in Westwood ABSE
+ 
+  
+  Time m_lastAck;                                  //!< Time at which the previous ACK arrived
+
+  double m_deltaT;                                 //!< Inter-arrival ACK time
+ 
   virtual uint32_t SlowStart (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
   virtual void CongestionAvoidance (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
 
 private:
- void EstimateERE (const Time& rtt, Ptr<TcpSocketState> tcb);
+
+  /**
+   * Update the total number of acknowledged packets during the current RTT
+   *
+   * \param [in] acked the number of packets the currently received ACK acknowledges
+   */
+
+
+  /**
+   * Calculate the Eligible Rate Estimate
+   *
+   * \param [in] rtt the RTT estimation.
+   * \param [in] tcb the socket state.
+   */
+  void CalculateERE (const Time& rtt, Ptr<TcpSocketState> tcb);
+  
+  /**
+   * \brief Calculate the best allowable sending rate
+   *
+   * \param [in] m_minRtt the minimum RTT seen so far
+   * \param [in] tcb the socket state.
+   */
+
+  void CalculateBestRate (const Time& m_minRtt, Ptr<TcpSocketState> tcb);
+        
 
 };
 
