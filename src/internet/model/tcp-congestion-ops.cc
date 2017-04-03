@@ -298,9 +298,9 @@ TcpNewReno::PktsAcked (Ptr<TcpSocketState> tcb, uint32_t packetsAcked,
 /**
  * \brief To calculate the best allowable sending rate
  *
- * This function calculates m_bestRate by using m_minRtt, which is the smallest time in which an ACK has been received.
+ * This function calculates m_bestRate by using minRtt, which is the smallest time in which an ACK has been received.
  *
- * \param m_minRtt minimum round-trip-time seen so far
+ * \param minRtt minimum round-trip-time seen so far
  * \param tcb internal congestion state
  */
 void
