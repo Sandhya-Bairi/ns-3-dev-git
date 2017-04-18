@@ -105,6 +105,7 @@ private:
    */
 
   void CalculateBestRate (const Time& m_minRtt, Ptr<TcpSocketState> tcb);
+  void CongestionAvoidance (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked);
         
 
 };

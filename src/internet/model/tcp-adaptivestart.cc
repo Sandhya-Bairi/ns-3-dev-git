@@ -101,6 +101,7 @@ TcpAdaptiveStart::IncreaseWindow (Ptr<TcpSocketState> tcb, uint32_t segmentsAcke
    *         (state->m_ssThresh)        the current m_ssThresh value
    *         (m_currentERE * m_minRtt)  this metric is as proposed in the paper
    */
+  tcb->m_ssThresh = std::max (2 * tcb->m_segmentSize, uint32_t (m_currentERE ));
 
   if (tcb->m_cWnd < tcb->m_ssThresh)
     {
@@ -134,6 +135,31 @@ TcpAdaptiveStart::IncreaseWindow (Ptr<TcpSocketState> tcb, uint32_t segmentsAcke
  * \param segmentsAcked count of segments acked
  * \param rtt last round-trip-time
  */
+
+void
+TcpAdaptiveStart::CongestionAvoidance (Ptr<TcpSocketState> tcb, uint32_t segmentsAcked)
+{
+  NS_LOG_FUNCTION (this << tcb << segmentsAcked);
+
+  if (segmentsAcked > 0)
+    {
+      
+       double adder = static_cast<double> (tcb->m_segmentSize * tcb->m_segmentSize) / tcb->m_cWnd.Get ();
+       adder = std::max (1.0, adder);
+      
+       /**
+         If CongestionAvoidance() has been called not because of loss event, rather because of our comparison with ssthresh,
+         then tcb->m_cWnd should continue from its previous value, and not start from 1.
+        */
+       if(tcb->m_congState!=4)
+         tcb->m_cWnd = std::max(tcb->m_ssThresh, tcb->m_cWnd);
+      
+      tcb->m_cWnd += static_cast<uint32_t> (adder);
+      NS_LOG_INFO ("In CongAvoid, updated to cwnd " << tcb->m_cWnd <<
+                   " ssthresh " << tcb->m_ssThresh);
+    }
+}
+
 
 void
 TcpAdaptiveStart::PktsAcked (Ptr<TcpSocketState> tcb, uint32_t packetsAcked,
@@ -177,7 +203,10 @@ TcpAdaptiveStart::PktsAcked (Ptr<TcpSocketState> tcb, uint32_t packetsAcked,
   NS_LOG_LOGIC ("MinRtt: " << m_minRtt.GetMilliSeconds () << "ms");
 
 
-  tcb->m_ssThresh = std::max (2 * tcb->m_segmentSize, uint32_t (m_currentERE * static_cast<double> (m_minRtt.GetSeconds ())));
+  //uint32_t substitute = std::max (2 * tcb->m_segmentSize, uint32_t (tcb->m_ssThresh));
+  //tcb->m_ssThresh = std::max (substitute, uint32_t (m_currentERE * static_cast<double> (m_minRtt.GetSeconds ())));
+  
+  tcb->m_ssThresh = std::max (2 * tcb->m_segmentSize, uint32_t (m_currentERE ));
   
   NS_LOG_LOGIC ("currentERE : " << m_currentERE <<"\nssthresh set to " << tcb->m_ssThresh);
 
@@ -290,7 +319,7 @@ TcpAdaptiveStart::GetSsThresh (Ptr<const TcpSocketState> tcb,
                 m_minRtt << " ssthresh: " <<
                 m_currentERE * static_cast<double> (m_minRtt.GetSeconds ()));
  
-  return std::max (2 * tcb->m_segmentSize, uint32_t (m_currentERE * static_cast<double> (m_minRtt.GetSeconds ())));
+  return std::max (2 * tcb->m_segmentSize, uint32_t (m_currentERE));
 }
 
 
